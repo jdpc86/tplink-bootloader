@@ -113,13 +113,13 @@ enum fw_type gset_fw_type(enum fw_type type)
 
 STATUS nm_tpFirmwareMd5Check(unsigned char *ptr,int bufsize)
 {
-	unsigned char fileMd5Checksum[IMAGE_SIZE_MD5];
+	unsigned char fileMd5Checksum[IMAGE_SIZE_MD5]; //char [] of size 0x10
 	unsigned char digst[IMAGE_SIZE_MD5];
 	
-	memcpy(fileMd5Checksum, ptr + IMAGE_SIZE_LEN, IMAGE_SIZE_MD5);
-	memcpy(ptr + IMAGE_SIZE_LEN, md5Key, IMAGE_SIZE_MD5);
+	memcpy(fileMd5Checksum, ptr + IMAGE_SIZE_LEN, IMAGE_SIZE_MD5); //copy chksum into fileMd5Checksum 0x04 - 0x10
+	memcpy(ptr + IMAGE_SIZE_LEN, md5Key, IMAGE_SIZE_MD5);//copy key to 0x04 - 0x10
 
-	md5_make_digest(digst, ptr + IMAGE_SIZE_LEN, bufsize - IMAGE_SIZE_LEN);
+	md5_make_digest(digst, ptr + IMAGE_SIZE_LEN, bufsize - IMAGE_SIZE_LEN); // re-calculate md5 checksum 0x04 - total - 0x04
 
 	if (0 != memcmp(digst, fileMd5Checksum, IMAGE_SIZE_MD5))
 	{
@@ -127,7 +127,7 @@ STATUS nm_tpFirmwareMd5Check(unsigned char *ptr,int bufsize)
 		return -1;
 	}
 
-	memcpy(ptr + IMAGE_SIZE_LEN, fileMd5Checksum, IMAGE_SIZE_MD5);
+	memcpy(ptr + IMAGE_SIZE_LEN, fileMd5Checksum, IMAGE_SIZE_MD5); // restore original image with checksum
 
 	return 0;
 }
@@ -135,24 +135,24 @@ STATUS nm_tpFirmwareMd5Check(unsigned char *ptr,int bufsize)
 int handle_fw_cloud(unsigned char *buf, int buf_len)
 {	
 #if 0
-	unsigned char md5_dig[IMAGE_SIZE_MD5];
-	unsigned char sig_buf[IMAGE_LEN_RSA_SIG];
+	unsigned char md5_dig[IMAGE_SIZE_MD5]; //digest for generating signature
+	unsigned char sig_buf[IMAGE_LEN_RSA_SIG]; //rsa sig
 	unsigned char tmp_rsa_sig[IMAGE_LEN_RSA_SIG];
 	int ret = 0;
 
 	/*backup data*/
-	memcpy(tmp_rsa_sig,buf + IMAGE_SIZE_RSA_SIG,IMAGE_LEN_RSA_SIG);
-	memcpy(sig_buf, buf + IMAGE_SIZE_RSA_SIG, IMAGE_LEN_RSA_SIG);
+	memcpy(tmp_rsa_sig,buf + IMAGE_SIZE_RSA_SIG,IMAGE_LEN_RSA_SIG); //0x11c+0x14 starting 0x130 length 0x80 to 0x1b0
+	memcpy(sig_buf, buf + IMAGE_SIZE_RSA_SIG, IMAGE_LEN_RSA_SIG); //save to tmp and sig buff
 	
 	/* fill with 0x0 */
 	memset(buf + IMAGE_SIZE_RSA_SIG, 0x0, IMAGE_LEN_RSA_SIG);
 
-	md5_make_digest(md5_dig, buf + IMAGE_SIZE_FWTYPE, buf_len - IMAGE_SIZE_FWTYPE);
+	md5_make_digest(md5_dig, buf + IMAGE_SIZE_FWTYPE, buf_len - IMAGE_SIZE_FWTYPE); starting 0x14, total len - 0x14, rest of the image
 
 	ret = rsaVerifySignByBase64EncodePublicKeyBlob(rsaPubKey, strlen((char *)rsaPubKey),
                 md5_dig, IMAGE_SIZE_MD5, sig_buf, IMAGE_LEN_RSA_SIG);
 
-	memcpy(buf + IMAGE_SIZE_RSA_SIG,tmp_rsa_sig,IMAGE_LEN_RSA_SIG);
+	memcpy(buf + IMAGE_SIZE_RSA_SIG,tmp_rsa_sig,IMAGE_LEN_RSA_SIG); //restore image after verification
 
 	if (NULL == ret)
 	{
@@ -181,7 +181,7 @@ STATUS nm_tpFirmwareFindType(char *ptr, int len, char *buf, int buf_len)
 		return -1;
 	}
 	
-	pBuf = ptr + IMAGE_SIZE_FWTYPE;
+	pBuf = ptr + IMAGE_SIZE_FWTYPE; 0x14
 
 	//find the fw type name begin and end
 	while (*(pBuf + end) != '\n' && end < IMAGE_CLOUD_HEAD_OFFSET)
@@ -211,7 +211,7 @@ STATUS nm_tpFirmwareFindType(char *ptr, int len, char *buf, int buf_len)
 STATUS nm_tpFirmwareVerify(unsigned char *ptr,int len)
 {
 	int ret;
-	char fw_type_name[FW_TYPE_NAME_LEN_MAX];
+	char fw_type_name[FW_TYPE_NAME_LEN_MAX]; //0xff
 	struct fw_type_option *ptr_fw_type = NULL;
 	
 	memset(fw_type_name, 0x0, FW_TYPE_NAME_LEN_MAX);
@@ -223,7 +223,7 @@ STATUS nm_tpFirmwareVerify(unsigned char *ptr,int len)
 	{
 		if (!ptr_fw_type || !ptr_fw_type->name)
 		{
-			gset_fw_type(FW_TYPE_COMMON);
+			gset_fw_type(FW_TYPE_COMMON); //empty fw-type? use common
 			break;
 		}
 		
@@ -297,7 +297,7 @@ STATUS nm_getDataFromFwupFile(NM_PTN_STRUCT *ptnStruct, char *fwupPtnIndex, char
     int index = 0;
     int paraId = -1;
     int argc;
-    char *argv[NM_FWUP_PTN_INDEX_ARG_NUM_MAX];
+    char *argv[NM_FWUP_PTN_INDEX_ARG_NUM_MAX]; //32*8
     NM_PTN_ENTRY *currPtnEntry = NULL;
 
     argc = nm_lib_makeArgs(fwupPtnIndex, argv, NM_FWUP_PTN_INDEX_ARG_NUM_MAX);
@@ -369,7 +369,7 @@ STATUS nm_getDataFromFwupFile(NM_PTN_STRUCT *ptnStruct, char *fwupPtnIndex, char
     }
 
     currPtnEntry->upgradeInfo.dataType = NM_FWUP_UPGRADE_DATA_FROM_FWUP_FILE;
-    currPtnEntry->upgradeInfo.dataStart = (unsigned int)fwupFileBase + NM_FWUP_PTN_INDEX_SIZE;
+    currPtnEntry->upgradeInfo.dataStart = (unsigned int)fwupFileBase + NM_FWUP_PTN_INDEX_SIZE; + 0x800
     /* length of partition-table is "probe to os-image"(4 bytes) and ptn-index-file(string) */
     currPtnEntry->upgradeInfo.dataLen = sizeof(int) + strlen((char*)(currPtnEntry->upgradeInfo.dataStart + sizeof(int)));
     
@@ -621,9 +621,9 @@ STATUS nm_updateDataToNvram(NM_PTN_STRUCT *ptnStruct)
                 currPtnEntry->upgradeInfo.dataStart,
                 currPtnEntry->upgradeInfo.dataLen);
 
-			/* Éý¼¶¹ý³ÌÖÐ½«Éý¼¶ÎÄ¼þ·Ö³É¶à¸ö·ÖÆ¬½øÐÐÉý¼¶, ÕâÑù×öÊÇÎªÁËÔÚÉý¼¶Íê
-			 * Ò»¸ö·ÖÆ¬ºó¿ÉÒÔÍ³¼ÆÒ»´Îµ±Ç°ÒÑ¾­Éý¼¶ÎÄ¼þ³¤¶È, ´Ó¶øÊ¹ÉÏ²ãÄ£¿éÖªµÀ
-			 * µ±Ç°µÄÉý¼¶½ø¶È.ÇÐ·Ö·ÖÆ¬Ê±ÐèÒª×¢ÒâÉý¼¶¹ý³ÌÖÐflashµÄblock¶ÔÆëÎÊÌâ */
+			/* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½Ö³É¶ï¿½ï¿½ï¿½ï¿½Æ¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+			 * Ò»ï¿½ï¿½ï¿½ï¿½Æ¬ï¿½ï¿½ï¿½ï¿½ï¿½Í³ï¿½ï¿½Ò»ï¿½Îµï¿½Ç°ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½, ï¿½Ó¶ï¿½Ê¹ï¿½Ï²ï¿½Ä£ï¿½ï¿½Öªï¿½ï¿½
+			 * ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½.ï¿½Ð·Ö·ï¿½Æ¬Ê±ï¿½ï¿½Òª×¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½flashï¿½ï¿½blockï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
             if (currPtnEntry->upgradeInfo.dataLen > NM_FWUP_FRAGMENT_SIZE)
             {
                 fwupDataLen = currPtnEntry->upgradeInfo.dataLen;
@@ -697,9 +697,9 @@ STATUS nm_updateDataToNvram(NM_PTN_STRUCT *ptnStruct)
                         fwupDataLen -= NM_FWUP_FRAGMENT_SIZE;
                         NM_DEBUG("PTN n %02d: write bytes = %08x", index+1, g_nmCountFwupCurrWriteBytes);
                     }
-					/* add by mengqing, 18Sep09, ÓÉÓÚ¶Ôµ¥¸öµÄFLASH¶ÁÐ´²Ù×÷Ê¹ÓÃtasklock¼ÓËø£¬Éý¼¶Èí¼þÊ±
-					 * ÐèÒªÔÚ¸÷¸öÎÄ¼þ¿éÖ®¼äÔö¼ÓtaskdelayÈËÎªÊÍ·ÅCPU£¬·ñÔòCPU¿ÉÄÜ±»Éý¼¶Ä£¿é³¤ÆÚÕ¼¾Ýµ¼ÖÂ
-					 * webÒ³ÃæÎÞ·¨»ñµÃµ±Ç°µÄÉý¼¶½ø¶È */
+					/* add by mengqing, 18Sep09, ï¿½ï¿½ï¿½Ú¶Ôµï¿½ï¿½ï¿½ï¿½ï¿½FLASHï¿½ï¿½Ð´ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½tasklockï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±
+					 * ï¿½ï¿½Òªï¿½Ú¸ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½Ö®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½taskdelayï¿½ï¿½Îªï¿½Í·ï¿½CPUï¿½ï¿½ï¿½ï¿½ï¿½ï¿½CPUï¿½ï¿½ï¿½Ü±ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½é³¤ï¿½ï¿½Õ¼ï¿½Ýµï¿½ï¿½ï¿½
+					 * webÒ³ï¿½ï¿½ï¿½Þ·ï¿½ï¿½ï¿½Ãµï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 
 					if(numBlookUpdate >= 70)
 					{
@@ -849,14 +849,14 @@ STATUS nm_checkUpgradeMode(NM_PTN_STRUCT *ptnStruct)
 
 	/* check partition-table partition base address is equal or not*/
 #if defined(CFG_DOUBLE_BOOT_FACTORY) || defined(CFG_DOUBLE_BOOT_SECOND)
-	if ((ptnEntry = nm_lib_ptnNameToEntry(ptnStruct, NM_PTN_NAME_PTN_TABLE)) == NULL)
+	if ((ptnEntry = nm_lib_ptnNameToEntry(ptnStruct, NM_PTN_NAME_PTN_TABLE)) == NULL)//partition table base in image
 	{
 		NM_ERROR("Up file partition-table not found!\n");
 		return ERROR;
 		
 	}
 
-	if (ptnEntry->base != NM_PTN_TABLE_BASE)
+	if (ptnEntry->base != NM_PTN_TABLE_BASE) //
 	{
 		NM_ERROR("Up file partition-table base address changed up(0x%08x) flash(0x%08x)!\n",
 			ptnEntry->base, NM_PTN_TABLE_BASE);
@@ -865,7 +865,7 @@ STATUS nm_checkUpgradeMode(NM_PTN_STRUCT *ptnStruct)
 #endif
 
 	/* do not allow double boot upgrade to single boot or single to double */
-	if ((ptnEntry = nm_lib_ptnNameToEntry(ptnStruct, NM_PTN_NAME_EXTRA_PARA)) != NULL)
+	if ((ptnEntry = nm_lib_ptnNameToEntry(ptnStruct, NM_PTN_NAME_EXTRA_PARA)) != NULL) //extra param
 	{
 		/* double boot up file must have extra-para partition for boot mode check */
 		if (ptnEntry->upgradeInfo.dataType == NM_FWUP_UPGRADE_DATA_FROM_FWUP_FILE)
